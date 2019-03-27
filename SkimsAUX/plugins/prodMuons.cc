@@ -107,11 +107,22 @@ prodMuons::prodMuons(const edm::ParameterSet & iConfig)
   produces<std::vector<float> >("muonsRelIso");
   produces<std::vector<float> >("muonsMiniIso");
   produces<std::vector<float> >("muonspfActivity");
-  //here add muon vtx info /////////////////////////////////////////////??TODO 
-  produces<std::vector<float> >("muonsD0");
-  produces<std::vector<float> >("muonsDz");
-  produces<std::vector<float> >("muonsdD0");
-  produces<std::vector<float> >("muonsdDz");
+  //here add muon vtx info /////////////////////////////////////////////??TODO  ADD THE IMPACT STUFF HERE!!!!!
+
+  produces<std::vector<float> >("muonsDB_PV2D");
+  produces<std::vector<float> >("muonsDB_PV3D");
+  produces<std::vector<float> >("muonsDB_PVDZ");
+  produces<std::vector<float> >("muonsDB_BS2D");
+  produces<std::vector<float> >("muonsDB_BS3D");
+  produces<std::vector<float> >("muonseDB_PV2D");
+  produces<std::vector<float> >("muonseDB_PV3D");
+  produces<std::vector<float> >("muonseDB_PVDZ");
+  produces<std::vector<float> >("muonseDB_BS2D");
+  produces<std::vector<float> >("muonseDB_BS3D");
+  produces<std::vector<float> >("muonsBT_Dz");
+  produces<std::vector<float> >("muonsBT_Dxy");
+  produces<std::vector<float> >("muonsBTe_Dxy");
+  produces<std::vector<float> >("muonsBTe_Dz");
   produces<int>("nMuons");
 }//end constructor
 
@@ -164,10 +175,21 @@ bool prodMuons::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   std::unique_ptr<int> nMuons(new int);
   std::unique_ptr<int> nMuonsCut (new int);
   //vertex info?
-  std::unique_ptr<std::vector<float> > muonsD0( new std::vector<float>());
-  std::unique_ptr<std::vector<float> > muonsDz( new std::vector<float>());
-  std::unique_ptr<std::vector<float> > muonsdD0( new std::vector<float>());
-  std::unique_ptr<std::vector<float> > muonsdDz( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonsDB_PV2D( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonsDB_PV3D( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonsDB_PVDZ( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonsDB_BS2D( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muosnDB_BS3D( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonseDB_PV2D( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonseDB_PV3D( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonseDB_PVDZ( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonseDB_BS2D( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonseDB_BS3D( new std::vector<float>());
+
+  std::unique_ptr<std::vector<float> > muonsBT_Dz( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonsBT_Dxy( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonsBTe_Dxy( new std::vector<float>());
+  std::unique_ptr<std::vector<float> > muonsBTe_Dz( new std::vector<float>());
 
    if (vertices->size() > 0) 
   {
@@ -229,12 +251,27 @@ bool prodMuons::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
         if( isTightID ) muonsFlagTight->push_back(1); else muonsFlagTight->push_back(0);
 
 
-		//need to fill vertex info?
-		muonsD0->push_back( m->dB() );
-		muonsdD0->push_back( m->edB() );
+
 		
-		muonsDz->push_back( m->muonBestTrack()->dz(vtxpos));
-		muonsdDz->push_back( m->muonBestTrack()->dzError());
+
+		//need to fill vertex info?
+		muonsDB_PV2D->push_back( m->dB(pat::Muon::PV2D) );
+		muonsDB_PV3D->push_back( m->dB(pat::Muon::PV3D) );
+		muonsDB_PVDZ->push_back( m->dB(pat::Muon::PVDZ) );
+		muonsDB_BS2D->push_back( m->dB(pat::Muon::BS2D) );
+		muonsDB_BS3D->push_back( m->dB(pat::Muon::BS3D) );
+		
+		muonseDB_PV2D->push_back( m->edB(pat::Muon::PV2D) );
+		muonseDB_PV3D->push_back( m->edB(pat::Muon::PV3D) );
+		muonseDB_PVDZ->push_back( m->edB(pat::Muon::PVDZ) );
+		muonseDB_BS2D->push_back( m->edB(pat::Muon::BS2D) );
+		muonseDB_BS3D->push_back( m->edB(pat::Muon::BS3D) );
+		
+		muonsBT_Dz->push_back( m->muonsBestTrack()->dz(vtxPos));
+		muonsBT_Dxy->push_back( m->muonsBestTrack()->dxy(vtxPos));
+		muonsBTe_Dz->push_back(m->muonBestTrack()->dzError());//error not calculated wrt to beamspot?????
+		muonsBTe_Dxy->push_back(m->muonBestTrack()->dxyError());
+		//Best track is calculated WRT vtxpos i.e. fitted beamspot/PV
         
   //    }
   //
@@ -270,10 +307,21 @@ bool prodMuons::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   iEvent.put(std::move(muonsMiniIso), "muonsMiniIso");
   iEvent.put(std::move(muonspfActivity), "muonspfActivity");
   iEvent.put(std::move(nMuons), "nMuons");
-  iEvent.put(std::move(muonsD0), "muonsD0");
-  iEvent.put(std::move(muonsdD0), "muonsdD0");
-  iEvent.put(std::move(muonsDz), "muonsDz");
-  iEvent.put(std::move(muonsdDz), "muonsdDz");
+  iEvent.put(std::move(muonsDB_PV2D), "muonsDB_PV2D");
+  iEvent.put(std::move(muonsDB_PV3D), "muonsDB_PV3D");
+  iEvent.put(std::move(muonsDB_PVDZ), "muonsDB_PVDZ");
+  iEvent.put(std::move(muonsDB_BS2D), "muonsDB_BS2D");
+  iEvent.put(std::move(muonsDB_BS3D), "muonsDB_BS3D");
+  iEvent.put(std::move(muonseDB_PV2D), "muonseDB_PV2D");
+  iEvent.put(std::move(muonseDB_PV3D), "muonseDB_PV3D");
+  iEvent.put(std::move(muonseDB_PVDZ), "muonseDB_PVDZ");
+  iEvent.put(std::move(muonseDB_BS2D), "muonseDB_BS2D");
+  iEvent.put(std::move(muonseDB_BS3D), "muonseDB_BS3D");
+  iEvent.put(std::move(muonsBT_Dz), "muonsBT_Dz");
+  iEvent.put(std::move(muonsBT_Dxy), "muonsBT_Dxy");
+  iEvent.put(std::move(muonsBTe_Dz), "muonsBTe_Dz");
+  iEvent.put(std::move(muonsBTe_Dxy),"muonsBTe_Dxy");
+
 
 	return true;
 
