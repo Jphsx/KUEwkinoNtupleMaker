@@ -44,7 +44,7 @@ class prodMuons : public edm::EDFilter
   //bool doMuonVeto_;//, doMuonID_, doMuonVtx_;
 //  int doMuonIso_; // 0: don't do any isolation; 1: relIso;  2: miniIso
   double minMuPt_, maxMuEta_, maxMuD0_, maxMuDz_, maxMuRelIso_, maxMuMiniIso_, minMuNumHit_;
-//  double minMuPtForMuon2Clean_;
+  double minMuPtForMuon2Clean_; //this junk is used by other modules
 //  bool specialFix_;
 //  edm::InputTag badGlobalMuonTaggerSrc_, cloneGlobalMuonTaggerSrc_;
 //  edm::EDGetTokenT<edm::PtrVector<reco::Muon>> badGlobalMuonTok_, cloneGlobalMuonTok_;
@@ -54,11 +54,18 @@ class prodMuons : public edm::EDFilter
   bool isMediumPlusMuon(const pat::Muon & muon, const reco::Vertex::Point & vtxpos);
   bool isTightMuon(const pat::Muon & muon, const reco::Vertex::Point & vtxpos);
 //  bool isTightMuonOld(const pat::Muon & muon, const reco::Vertex::Point & vtxpos);
+
+  float getMtw(const pat::Muon & m, const edm::View<reco::MET>& met);
+  float getRelIso(const pat::Muon & m);
+
+
 };
 
 
 prodMuons::prodMuons(const edm::ParameterSet & iConfig) 
 {
+   minMuPtForMuon2Clean_ = iConfig.getUntrackedParameter<double>("minMuPtForMuon2Clean", 10);
+
   muonSrc_      = iConfig.getParameter<edm::InputTag>("MuonSource");
   vtxSrc_       = iConfig.getParameter<edm::InputTag>("VertexSource");
   metSrc_       = iConfig.getParameter<edm::InputTag>("metSource");
@@ -71,7 +78,7 @@ prodMuons::prodMuons(const edm::ParameterSet & iConfig)
   maxMuRelIso_  = iConfig.getParameter<double>("MaxMuRelIso");
   maxMuMiniIso_ = iConfig.getParameter<double>("MaxMuMiniIso");
   minMuNumHit_  = iConfig.getParameter<double>("MinMuNumHit");
-  doMuonVeto_   = iConfig.getParameter<bool>("DoMuonVeto"); //?
+//  doMuonVeto_   = iConfig.getParameter<bool>("DoMuonVeto"); //?
 //  doMuonID_     = iConfig.getParameter<bool>("DoMuonID");
 //  doMuonVtx_    = iConfig.getParameter<bool>("DoMuonVtxAssociation");
 //  doMuonIso_    = iConfig.getParameter<int>("DoMuonIsolation");
@@ -85,7 +92,9 @@ prodMuons::prodMuons(const edm::ParameterSet & iConfig)
   RhoTok_ = consumes<double>(rhoSrc_);
 
   produces<std::vector<pat::Muon> >("");
-//  produces<std::vector<pat::Muon> >("mu2Clean");
+  produces<std::vector<pat::Muon> >("mu2Clean");//used by jet collections
+  produces<std::vector<pat::Muon> >("mu2Cut");//used by jet collections
+
   //0: loose;  1: medium;  1.5: mediumPlus 2: tight
   produces<std::vector<float> >("muonsIDtype");
   produces<std::vector<int> >("muonsFlagLoose");
@@ -136,7 +145,10 @@ bool prodMuons::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 
 	 //check which ones to keep
   std::unique_ptr<std::vector<pat::Muon> > prod(new std::vector<pat::Muon>()); //?
- // std::unique_ptr<std::vector<pat::Muon> > mu2Clean(new std::vector<pat::Muon>());
+ 
+  std::unique_ptr<std::vector<pat::Muon> > mu2Clean(new std::vector<pat::Muon>());
+  std::unique_ptr<std::vector<pat::Muon> > mu2Cut(new std::vector<pat::Muon>());
+
   std::unique_ptr<std::vector<TLorentzVector> > muonsLVec(new std::vector<TLorentzVector>());
   std::unique_ptr<std::vector<float> > muonsCharge(new std::vector<float>());
   std::unique_ptr<std::vector<float> > muonsMtw(new std::vector<float>());
@@ -150,7 +162,7 @@ bool prodMuons::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   std::unique_ptr<std::vector<int> > muonsFlagMediumPlus( new std::vector<int>());
   std::unique_ptr<std::vector<int> > muonsFlagTight(new std::vector<int>());
   std::unique_ptr<int> nMuons(new int);
-
+  std::unique_ptr<int> nMuonsCut (new int);
   //vertex info?
   std::unique_ptr<std::vector<float> > muonsD0( new std::vector<float>());
   std::unique_ptr<std::vector<float> > muonsDz( new std::vector<float>());
@@ -167,7 +179,7 @@ bool prodMuons::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
       if (std::abs(m->eta()) >= maxMuEta_) continue;
 
       bool isLooseID = isLooseMuon((*m));
-	  bool isMediumID = isMediumMuon((*m));
+      bool isMediumID = isMediumMuon((*m));
       bool isMediumPlusID = isMediumPlusMuon((*m), vtxpos);
       bool isTightID = isTightMuon((*m), vtxpos);
 
@@ -204,7 +216,7 @@ bool prodMuons::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		muonspfActivity->push_back(pfActivity);
 
         float idtype =-1;
-		if( isLooseId ) idtype = 0;
+		if( isLooseID ) idtype = 0;
         if( isMediumID ) idtype = 1;
 		if( isMediumPlusID ) idtype = 1.5;
         if( isTightID ) idtype = 2;
@@ -221,10 +233,14 @@ bool prodMuons::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
 		muonsD0->push_back( m->dB() );
 		muonsdD0->push_back( m->edB() );
 		
-		muonsDz->push_back( m->muonBestTrack()->dz(vtxPos));
+		muonsDz->push_back( m->muonBestTrack()->dz(vtxpos));
 		muonsdDz->push_back( m->muonBestTrack()->dzError());
         
   //    }
+  //
+  	 //add muons to clean from jets 
+  	 if(isLooseID && miniIso < maxMuMiniIso_ && m->pt() > minMuPtForMuon2Clean_) mu2Clean->push_back(*m);
+  	 if(isLooseID && miniIso < maxMuMiniIso_ ) mu2Cut->push_back(*m); // minMuPt_ && maxMuEta_ already applied
       //add muons to clean from jets 
       //if(isMediumID && miniIso < maxMuMiniIso_ && m->pt() > minMuPtForMuon2Clean_) mu2Clean->push_back(*m);
 
@@ -235,8 +251,13 @@ bool prodMuons::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   	//bool result = (doMuonVeto_ ? (prod->size() == 0) : true);
 	
   *nMuons = prod->size();
+
+  *nMuonsCut = mu2Cut->size();
 	// store in the event
   iEvent.put(std::move(prod));
+  iEvent.put(std::move(mu2Clean), "mu2Clean");
+  iEvent.put(std::move(mu2Cut), "mu2Cut");
+  iEvent.put(std::move(nMuonsCut),"nMuonsCut");
   iEvent.put(std::move(muonsIDtype), "muonsIDtype");
   iEvent.put(std::move(muonsFlagLoose), "muonsFlagLoose");
   iEvent.put(std::move(muonsFlagMedium), "muonsFlagMedium");
@@ -254,15 +275,17 @@ bool prodMuons::filter(edm::Event& iEvent, const edm::EventSetup& iSetup)
   iEvent.put(std::move(muonsDz), "muonsDz");
   iEvent.put(std::move(muonsdDz), "muonsdDz");
 
+	return true;
+
 }//end filter
 //kinematic variable fn's
-double prodMuons::getMtw(const pat::Muon & muon, const reco::MET & met)
+float prodMuons::getMtw(const pat::Muon & m, const edm::View<reco::MET>& met)
 {
 	return sqrt( 2*( (met)[0].pt()*m.pt() -( (met)[0].px()*m.px() + (met)[0].py()*m.py() ) ) );
 
 }
 ///Isolation functions
-double prodMuons::getRelIso(const pat::Muon & muon)
+float prodMuons::getRelIso(const pat::Muon & m)
 {
 	return (m.pfIsolationR04().sumChargedHadronPt + std::max(0., m.pfIsolationR04().sumNeutralHadronEt + m.pfIsolationR04().sumPhotonEt - 0.5*m.pfIsolationR04().sumPUPt) ) / m.pt();
 }
@@ -270,10 +293,10 @@ double prodMuons::getRelIso(const pat::Muon & muon)
 bool prodMuons::isLooseMuon(const pat::Muon & muon)
 {
   bool isLoose = true;
-  if(doMuonID_)
-  {
+ 
+  
     isLoose = muon.isLooseMuon();
-  }
+  
   return isLoose;
 }
 bool prodMuons::isMediumMuon(const pat::Muon & muon)
@@ -343,8 +366,7 @@ bool prodMuons::isTightMuon(const pat::Muon & muon, const reco::Vertex::Point & 
 
   // ID cuts - always ask isGlobalMuon()
   if (muon.muonID("AllGlobalMuons") == 0){ isTight = false; return isTight; }
-  if (doMuonID_) 
-  {
+ 
     if(!muon.isPFMuon() ) isTight = false; 
     if( muon.globalTrack()->normalizedChi2() >= 10. ) isTight = false;
     if( muon.globalTrack()->hitPattern().numberOfValidMuonHits() <=0 ) isTight = false;
@@ -352,14 +374,15 @@ bool prodMuons::isTightMuon(const pat::Muon & muon, const reco::Vertex::Point & 
     if( muon.innerTrack()->hitPattern().numberOfValidPixelHits() == 0) isTight = false;
     if( muon.innerTrack()->hitPattern().trackerLayersWithMeasurement() <=5 ) isTight = false;
     if(debug_) {std::cout << "PassedMuon ID" << std::endl;}
-  }
+  
 
   // vertex association cuts - ignore if no vertex (see further)
-  if (doMuonVtx_) 
-  {
+ 
     if (std::abs(muon.innerTrack()->dxy(vtxpos)) >= maxMuD0_) isTight = false;
     if (std::abs(muon.innerTrack()->dz(vtxpos))  >= maxMuDz_) isTight = false;
     if(debug_) {std::cout << "PassedMuon Vtx Association" << std::endl;}
-  }
+  
   return isTight; 
 }
+#include "FWCore/Framework/interface/MakerMacros.h"
+DEFINE_FWK_MODULE(prodMuons);
