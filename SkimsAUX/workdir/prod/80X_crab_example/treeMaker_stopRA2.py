@@ -1152,8 +1152,9 @@ process.ak4Stop_Path = cms.Path(
                                    process.comb_seq * 
                                    process.printDecayPythia8 * process.prodGenInfo * process.prodGoodVertices * 
                                    process.prodMuonsNoIso * process.prodElectronsNoIso * process.prodIsoTrks * process.prodJetIDEventFilter *
-                                   process.prodJetIDEventFilterNoLep * process.METFilters *
-                                   process.noBadMuonsFilter * process.badMuonsFilter * process.duplicateMuonsFilter * process.prodJetsNoLep * 
+                                   #process.prodJetIDEventFilterNoLep * 
+				   process.METFilters *
+                                   process.noBadMuonsFilter * process.badMuonsFilter * process.duplicateMuonsFilter * # process.prodJetsNoLep * 
                                    process.prodJets * process.prodMET * process.prodEventInfo * process.trig_filter_seq * process.prodSecondaryVertex *
                                    #process.prodBTag *
                                    #process.goodPhotons *
